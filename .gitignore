@@ -1,0 +1,46 @@
+# Build output
+/build/
+/cmake-build-*/
+
+# CMake generated files
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/Makefile
+/install_manifest.txt
+
+# Qt Creator user/local settings
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qbs.user.*
+*.creator
+*.creator.user
+*.creator.user.*
+*.files
+*.includes
+*.config
+/.qtcreator/
+
+# Qt generated artifacts
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Windows artifacts
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.lib
+*.exp
+*.exe
+*.dll
+
+# Logs and temp
+*.log
+*.tmp
+*.user
+.DS_Store
+Thumbs.db

@@ -2,9 +2,12 @@
 
 #include "Ground.h"
 #include "Platform.h"
+#include "Spike.h"
 #include <QGraphicsView>
 #include <QKeyEvent>
 #include <QPen>
+#include <QPixmap>
+#include <utility>
 
 GameScene::GameScene(QObject *parent)
     : QGraphicsScene(parent),
@@ -14,7 +17,8 @@ GameScene::GameScene(QObject *parent)
       currentLevelIndex(0),
       goalItem(nullptr),
       dialogueTextItem(new QGraphicsTextItem()),
-      dialogueFramesLeft(0)
+      dialogueFramesLeft(0),
+      goalLockHintCooldownFrames(0)
 {
     addItem(p1);
     addItem(p2);
@@ -50,9 +54,12 @@ void GameScene::initLevels() {
     };
     lv1.goalRect = QRectF(2060, 480, 60, 80);
     lv1.dialogues = {
-        { QRectF(240, 0, 120, 600), QString("Watch your jump timing"), false },
-        { QRectF(1120, 0, 120, 600), QString("Almost at the goal"), false }
+        // Trigger 1: must jump onto platform at x=620, y=420, w=220, h=20
+        { QRectF(620, 370, 220, 50), QString("Watch your jump timing"), false },
+        // Trigger 2: must jump onto platform at x=1320, y=440, w=220, h=20
+        { QRectF(1320, 390, 220, 50), QString("Almost at the goal"), false }
     };
+    lv1.spikes = {};
     levels.push_back(lv1);
 
     LevelData lv2;
@@ -72,6 +79,17 @@ void GameScene::initLevels() {
         { QRectF(1880, 330, 180, 20) },
         { QRectF(2200, 420, 180, 20) }
     };
+    // Second level spikes: placed on ground, can be jumped over.
+    lv2.spikes = {
+        { QRectF(430, 530, 36, 30) },
+        { QRectF(466, 530, 36, 30) },
+        { QRectF(502, 530, 36, 30) },
+        { QRectF(1420, 530, 36, 30) },
+        { QRectF(1456, 530, 36, 30) },
+        { QRectF(1492, 530, 36, 30) },
+        { QRectF(2080, 530, 36, 30) },
+        { QRectF(2116, 530, 36, 30) }
+    };
     lv2.goalRect = QRectF(2460, 480, 60, 80);
     lv2.dialogues = {
         { QRectF(680, 0, 120, 600), QString("Chain your jumps here"), false },
@@ -90,9 +108,10 @@ void GameScene::loadLevel(int levelIndex) {
 
     keys.clear();
     dialogueFramesLeft = 0;
+    goalLockHintCooldownFrames = 0;
     dialogueTextItem->setVisible(false);
 
-    for (QGraphicsItem* item : levelItems) {
+    for (QGraphicsItem* item : std::as_const(levelItems)) {
         removeItem(item);
         delete item;
     }
@@ -101,16 +120,37 @@ void GameScene::loadLevel(int levelIndex) {
 
     setSceneRect(0, 0, lv.mapSize.width(), lv.mapSize.height());
 
-    for (const RectBlock &g : lv.grounds) {
+    // 第一关背景图（2200x600），放在最底层。
+    if (currentLevelIndex == 0) {
+        QPixmap level1Bg(":/assets/backgrouds/level1_bg.png");
+        if (!level1Bg.isNull()) {
+            auto *bgItem = new QGraphicsPixmapItem(level1Bg);
+            bgItem->setPos(0, 0);
+            bgItem->setZValue(-1000);
+            levelItems.push_back(bgItem);
+            addItem(bgItem);
+        } else {
+            showDialogue(QString("Background load failed: :/assets/backgrouds/level1_bg.png"), 180);
+        }
+    }
+
+    for (const RectBlock &g : std::as_const(lv.grounds)) {
         auto *ground = new Ground(g.rect.x(), g.rect.y(), g.rect.width(), g.rect.height());
         levelItems.push_back(ground);
         addItem(ground);
     }
 
-    for (const RectBlock &p : lv.platforms) {
+    for (const RectBlock &p : std::as_const(lv.platforms)) {
         auto *platform = new Platform(p.rect.x(), p.rect.y(), p.rect.width(), p.rect.height());
         levelItems.push_back(platform);
         addItem(platform);
+    }
+
+    for (const RectBlock &s : std::as_const(lv.spikes)) {
+        auto *spike = new Spike(s.rect.x(), s.rect.y(), s.rect.width(), s.rect.height());
+        spike->setZValue(20);
+        levelItems.push_back(spike);
+        addItem(spike);
     }
 
     goalItem = new QGraphicsRectItem(lv.goalRect);
@@ -144,6 +184,7 @@ void GameScene::mainGameLoop() {
 
     checkGoalAndMaybeSwitchLevel();
     checkDialogueTriggers();
+    checkSpikeCollisionAndRespawn();
     updateCamera();
 
     if (dialogueFramesLeft > 0) {
@@ -152,6 +193,10 @@ void GameScene::mainGameLoop() {
             dialogueTextItem->setVisible(false);
         }
     }
+
+    if (goalLockHintCooldownFrames > 0) {
+        --goalLockHintCooldownFrames;
+    }
 }
 
 void GameScene::checkGoalAndMaybeSwitchLevel() {
@@ -159,9 +204,25 @@ void GameScene::checkGoalAndMaybeSwitchLevel() {
         return;
     }
 
-    if (p1->sceneBoundingRect().intersects(goalItem->sceneBoundingRect())) {
-        loadLevel(currentLevelIndex + 1);
+    if (!p1->sceneBoundingRect().intersects(goalItem->sceneBoundingRect())) {
+        return;
     }
+
+    LevelData &lv = levels[currentLevelIndex];
+
+    // 第一关：必须触发全部对话点才能过关。
+    if (currentLevelIndex == 0) {
+        const int remaining = countUntriggeredDialogues(lv);
+        if (remaining > 0) {
+            if (goalLockHintCooldownFrames == 0) {
+                showDialogue(QString("Need %1 more dialogue trigger(s)").arg(remaining), 90);
+                goalLockHintCooldownFrames = 75;
+            }
+            return;
+        }
+    }
+
+    loadLevel(currentLevelIndex + 1);
 }
 
 void GameScene::checkDialogueTriggers() {
@@ -186,12 +247,65 @@ void GameScene::showDialogue(const QString& text, int frames) {
     dialogueFramesLeft = frames;
 }
 
-void GameScene::updateCamera() {
-    if (views().isEmpty()) {
+void GameScene::checkSpikeCollisionAndRespawn() {
+    LevelData &lv = levels[currentLevelIndex];
+
+    bool p1Hit = false;
+    bool p2Hit = false;
+
+    const auto p1Hits = p1->collidingItems();
+    for (QGraphicsItem* item : p1Hits) {
+        if (qgraphicsitem_cast<Spike*>(item)) {
+            p1Hit = true;
+            break;
+        }
+    }
+
+    const auto p2Hits = p2->collidingItems();
+    for (QGraphicsItem* item : p2Hits) {
+        if (qgraphicsitem_cast<Spike*>(item)) {
+            p2Hit = true;
+            break;
+        }
+    }
+
+    if (!p1Hit && !p2Hit) {
         return;
     }
 
-    QGraphicsView *view = views().first();
+    if (p1Hit) {
+        p1->setPos(lv.p1Spawn);
+    }
+    if (p2Hit) {
+        p2->setPos(lv.p2Spawn);
+    }
+
+    if (p1Hit && p2Hit) {
+        showDialogue(QString("Both players hit spikes!"), 90);
+    } else if (p1Hit) {
+        showDialogue(QString("Player 1 hit spike!"), 90);
+    } else {
+        showDialogue(QString("Player 2 hit spike!"), 90);
+    }
+}
+
+int GameScene::countUntriggeredDialogues(const LevelData& lv) const {
+    int remaining = 0;
+    for (const DialogueTrigger &d : lv.dialogues) {
+        if (!d.triggered) {
+            ++remaining;
+        }
+    }
+    return remaining;
+}
+
+void GameScene::updateCamera() {
+    const auto sceneViews = views();
+    if (sceneViews.isEmpty()) {
+        return;
+    }
+
+    QGraphicsView *view = sceneViews.first();
     const QRectF viewRect = view->viewport()->rect();
     const qreal halfW = viewRect.width() * 0.5;
     const qreal halfH = viewRect.height() * 0.5;

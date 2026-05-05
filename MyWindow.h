@@ -1,13 +1,12 @@
 #ifndef MYWINDOW_H
 #define MYWINDOW_H
 
+#include <QLabel>
+#include <QPushButton>
+#include <QStackedWidget>
 #include <QWidget>
 
-QT_BEGIN_NAMESPACE
-namespace Ui {
-class MyWindow;
-}
-QT_END_NAMESPACE
+class QGraphicsView;
 
 class MyWindow : public QWidget
 {
@@ -18,6 +17,11 @@ public:
     ~MyWindow() override;
 
 private:
-    Ui::MyWindow *ui;
+    QWidget* createIntroPage(const QString& backgroundRes, const QString& text, bool showStartButton);
+    QPushButton* createArrowButton(QWidget* parent);
+    void switchToGameView();
+
+    QStackedWidget* stacked;
+    QGraphicsView* gameView;
 };
 #endif // MYWINDOW_H

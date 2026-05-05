@@ -38,6 +38,7 @@ private:
         QPointF p2Spawn;
         QVector<RectBlock> grounds;
         QVector<RectBlock> platforms;
+        QVector<RectBlock> spikes;
         QRectF goalRect;
         QVector<DialogueTrigger> dialogues;
     };
@@ -47,7 +48,9 @@ private:
     void updateCamera();
     void checkGoalAndMaybeSwitchLevel();
     void checkDialogueTriggers();
+    void checkSpikeCollisionAndRespawn();
     void showDialogue(const QString& text, int frames);
+    int countUntriggeredDialogues(const LevelData& lv) const;
 
     Player *p1;
     Player *p2;
@@ -62,6 +65,7 @@ private:
 
     QGraphicsTextItem *dialogueTextItem;
     int dialogueFramesLeft;
+    int goalLockHintCooldownFrames;
 };
 
 #endif // GAMESCENE_H

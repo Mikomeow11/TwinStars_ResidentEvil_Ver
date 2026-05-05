@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include <QBrush>
+#include <QGraphicsPixmapItem>
 #include <QGraphicsRectItem>
 #include <QObject>
 #include <QSet>
@@ -20,6 +21,8 @@ private:
     qreal jumpSpeed;
     bool isOnGround;
     bool jumpPressedLastFrame;
+    bool facingRight;
+    QGraphicsPixmapItem* spriteItem;
 };
 
 #endif // PLAYER_H

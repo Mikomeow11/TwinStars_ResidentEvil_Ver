@@ -2,5 +2,7 @@
     <qresource prefix="/">
         <file>assets/tiles/ground_tile.png</file>
         <file>assets/backgrouds/level1_bg.png</file>
+        <file>assets/characters/p1_idle.png.png</file>
+        <file>assets/characters/p2_idle.png.png</file>
     </qresource>
 </RCC>

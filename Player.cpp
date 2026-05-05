@@ -2,6 +2,8 @@
 
 #include "Ground.h"
 #include "Platform.h"
+#include <QGraphicsPixmapItem>
+#include <QPixmap>
 #include <QGraphicsScene>
 #include <Qt>
 
@@ -13,10 +15,30 @@ Player::Player(int id, QColor color, QGraphicsItem *parent)
       gravity(0.8),
       jumpSpeed(14.0),
       isOnGround(false),
-      jumpPressedLastFrame(false)
+      jumpPressedLastFrame(false),
+      facingRight(true),
+      spriteItem(nullptr)
 {
-    setRect(0, 0, 40, 60);
-    setBrush(QBrush(color));
+    setRect(0, 0, 64, 96);
+    setBrush(Qt::NoBrush);
+    setPen(Qt::NoPen);
+
+    QString spritePath;
+    if (playerId == 1) {
+        spritePath = ":/assets/characters/p1_idle.png.png";
+    } else {
+        spritePath = ":/assets/characters/p2_idle.png.png";
+    }
+
+    QPixmap sprite(spritePath);
+    if (!sprite.isNull()) {
+        spriteItem = new QGraphicsPixmapItem(this);
+        spriteItem->setPixmap(sprite.scaled(rect().width(), rect().height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+        spriteItem->setPos(0, 0);
+    } else {
+        // Fallback: keep old colored rectangle when sprite loading fails.
+        setBrush(QBrush(color));
+    }
 }
 
 void Player::updatePosition(const QSet<int>& keys) {
@@ -32,6 +54,24 @@ void Player::updatePosition(const QSet<int>& keys) {
     }
     if (keys.contains(rightKey)) {
         dx += speed;
+    }
+
+    if (dx > 0) {
+        facingRight = true;
+    } else if (dx < 0) {
+        facingRight = false;
+    }
+
+    if (spriteItem) {
+        if (facingRight) {
+            spriteItem->setTransform(QTransform());
+            spriteItem->setPos(0, 0);
+        } else {
+            QTransform t;
+            t.scale(-1.0, 1.0);
+            spriteItem->setTransform(t);
+            spriteItem->setPos(rect().width(), 0);
+        }
     }
 
     // 只在按下瞬间触发跳跃，避免长按连跳

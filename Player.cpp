@@ -10,10 +10,10 @@
 Player::Player(int id, QColor color, QGraphicsItem *parent)
     : QGraphicsRectItem(parent),
       playerId(id),
-      speed(5.0),
+      speed(6.6),
       velocityY(0.0),
-      gravity(0.8),
-      jumpSpeed(14.0),
+      gravity(0.62),
+      jumpSpeed(15.8),
       isOnGround(false),
       jumpPressedLastFrame(false),
       facingRight(true),

@@ -23,6 +23,7 @@ private:
     bool jumpPressedLastFrame;
     bool facingRight;
     QGraphicsPixmapItem* spriteItem;
+    int jumpHoldFrames;
 };
 
 #endif // PLAYER_H

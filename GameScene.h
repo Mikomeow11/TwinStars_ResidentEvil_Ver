@@ -31,6 +31,14 @@ private:
         QString text;
         bool triggered = false;
     };
+    struct ItemTrigger {
+        QRectF area;
+        QString itemType;
+        QString p1PickupText;
+        QString p2PickupText;
+        bool picked = false;
+        QGraphicsRectItem* visualItem = nullptr;
+    };
 
     struct LevelData {
         QSizeF mapSize;
@@ -41,6 +49,7 @@ private:
         QVector<RectBlock> spikes;
         QRectF goalRect;
         QVector<DialogueTrigger> dialogues;
+        QVector<ItemTrigger> items;
     };
 
     void initLevels();
@@ -49,6 +58,8 @@ private:
     void checkGoalAndMaybeSwitchLevel();
     void checkDialogueTriggers();
     void checkSpikeCollisionAndRespawn();
+    void checkItemPickups();
+    void checkIdleDialogue();
     void showDialogue(const QString& text, int frames);
     int countUntriggeredDialogues(const LevelData& lv) const;
 
@@ -66,6 +77,19 @@ private:
     QGraphicsTextItem *dialogueTextItem;
     int dialogueFramesLeft;
     int goalLockHintCooldownFrames;
+    QString pendingNextLevelDialogue;
+
+    bool p1ReachedGoal;
+    bool p2ReachedGoal;
+    bool firstArrivalDialogueDone;
+    bool secondArrivalDialogueDone;
+
+    QPointF p1LastPos;
+    QPointF p2LastPos;
+    int p1IdleFrames;
+    int p2IdleFrames;
+    bool p1IdleHintUsed;
+    bool p2IdleHintUsed;
 };
 
 #endif // GAMESCENE_H

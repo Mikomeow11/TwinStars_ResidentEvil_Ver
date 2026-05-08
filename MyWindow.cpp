@@ -3,7 +3,6 @@
 #include "GameScene.h"
 #include <QFont>
 #include <QGraphicsView>
-#include <QHBoxLayout>
 #include <QPixmap>
 #include <QVBoxLayout>
 
@@ -14,97 +13,166 @@ MyWindow::MyWindow(QWidget *parent) : QWidget(parent), stacked(new QStackedWidge
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->addWidget(stacked);
 
-    // Page 1: start menu
-    QWidget* page1 = createIntroPage(
-        ":/assets/ui/start_page.png",
-        QString::fromUtf8("闪翼双星"),
-        true
-    );
-
-    // Page 2: story
-    QWidget* page2 = createIntroPage(
+    QWidget* coverPage = createCoverPage();
+    QWidget* prologuePage = createProloguePage();
+    QWidget* storyGuidePage = createGuidePage(
         ":/assets/ui/story_page.png",
-        QString::fromUtf8("背景介绍页（你可替换背景图）"),
-        false
+        QString::fromUtf8("游戏背景剧情页\n图片完成后请放到 assets/ui/story_page.png"),
+        "storyNextButton"
+    );
+    QWidget* p1GuidePage = createGuidePage(
+        ":/assets/ui/tutorial_p1.png",
+        QString::fromUtf8("P1 键位介绍\nW / A / S / D 控制移动"),
+        "p1GuideNextButton"
+    );
+    QWidget* p2GuidePage = createGuidePage(
+        ":/assets/ui/tutorial_p2.png",
+        QString::fromUtf8("P2 键位介绍\n方向键控制移动"),
+        "p2GuideNextButton"
     );
 
-    // Page 3: tutorial part 1
-    QWidget* page3 = createIntroPage(
-        ":/assets/ui/tutorial_1.png",
-        QString::fromUtf8("玩法介绍 1（你可替换背景图）"),
-        false
-    );
+    stacked->addWidget(coverPage);
+    stacked->addWidget(prologuePage);
+    stacked->addWidget(storyGuidePage);
+    stacked->addWidget(p1GuidePage);
+    stacked->addWidget(p2GuidePage);
 
-    // Page 4: tutorial part 2
-    QWidget* page4 = createIntroPage(
-        ":/assets/ui/tutorial_2.png",
-        QString::fromUtf8("玩法介绍 2（点击箭头进入游戏）"),
-        false
-    );
+    QPushButton* startBtn = coverPage->findChild<QPushButton*>("startButton");
+    QPushButton* prologueBtn = coverPage->findChild<QPushButton*>("prologueButton");
+    QPushButton* backBtn = prologuePage->findChild<QPushButton*>("backButton");
+    QPushButton* enterGameBtn = prologuePage->findChild<QPushButton*>("enterGameButton");
+    QPushButton* storyNextBtn = storyGuidePage->findChild<QPushButton*>("storyNextButton");
+    QPushButton* p1GuideNextBtn = p1GuidePage->findChild<QPushButton*>("p1GuideNextButton");
+    QPushButton* p2GuideNextBtn = p2GuidePage->findChild<QPushButton*>("p2GuideNextButton");
 
-    stacked->addWidget(page1);
-    stacked->addWidget(page2);
-    stacked->addWidget(page3);
-    stacked->addWidget(page4);
-
-    // Page transitions
-    QPushButton* startBtn = page1->findChild<QPushButton*>("startButton");
-    connect(startBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(1); });
-
-    QPushButton* arrow2 = page2->findChild<QPushButton*>("arrowButton");
-    QPushButton* arrow3 = page3->findChild<QPushButton*>("arrowButton");
-    QPushButton* arrow4 = page4->findChild<QPushButton*>("arrowButton");
-
-    connect(arrow2, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(2); });
-    connect(arrow3, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(3); });
-    connect(arrow4, &QPushButton::clicked, this, &MyWindow::switchToGameView);
+    connect(startBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(2); });
+    connect(prologueBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(1); });
+    connect(backBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(0); });
+    connect(enterGameBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(2); });
+    connect(storyNextBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(3); });
+    connect(p1GuideNextBtn, &QPushButton::clicked, this, [this]() { stacked->setCurrentIndex(4); });
+    connect(p2GuideNextBtn, &QPushButton::clicked, this, &MyWindow::switchToGameView);
 }
 
-QWidget* MyWindow::createIntroPage(const QString& backgroundRes, const QString& text, bool showStartButton) {
+QWidget* MyWindow::createCoverPage() {
     auto *page = new QWidget();
     page->setFixedSize(800, 600);
 
     auto *bgLabel = new QLabel(page);
     bgLabel->setGeometry(0, 0, 800, 600);
-    QPixmap bg(backgroundRes);
+    QPixmap bg(":/assets/ui/start_page.png");
     if (!bg.isNull()) {
-        bgLabel->setPixmap(bg.scaled(800, 600));
+        bgLabel->setPixmap(bg.scaled(800, 600, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
     } else {
         bgLabel->setStyleSheet("background-color: #2d114f;");
     }
 
-    auto *title = new QLabel(text, page);
-    title->setGeometry(40, 40, 720, 100);
-    title->setStyleSheet("color: #d7ff9a; background: transparent;");
-    title->setWordWrap(true);
-    title->setAlignment(Qt::AlignCenter);
-    QFont titleFont(QStringLiteral("Microsoft YaHei"), 22, QFont::Bold);
-    title->setFont(titleFont);
-
-    if (showStartButton) {
-        auto *startButton = new QPushButton(QString::fromUtf8("开始游戏"), page);
-        startButton->setObjectName("startButton");
-        startButton->setGeometry(290, 470, 220, 64);
-        startButton->setStyleSheet(
-            "QPushButton { background:#57e3e3; color:#3b2a00; border-radius:18px; font-size:28px; font-weight:700; }"
-            "QPushButton:hover { background:#7ef0f0; }"
-        );
-    } else {
-        QPushButton* arrow = createArrowButton(page);
-        arrow->setObjectName("arrowButton");
-    }
+    createTransparentButton(page, QRect(386, 442, 352, 46), "startButton");
+    createTransparentButton(page, QRect(364, 503, 354, 45), "prologueButton");
 
     return page;
 }
 
-QPushButton* MyWindow::createArrowButton(QWidget* parent) {
-    auto *arrow = new QPushButton(QString::fromUtf8("➜"), parent);
-    arrow->setGeometry(700, 500, 72, 72);
-    arrow->setStyleSheet(
-        "QPushButton { background:#ffb300; color:white; border-radius:18px; font-size:36px; font-weight:700; }"
-        "QPushButton:hover { background:#ffc933; }"
+QWidget* MyWindow::createProloguePage() {
+    auto *page = new QWidget();
+    page->setFixedSize(800, 600);
+    page->setStyleSheet("background-color: #140817;");
+
+    auto *title = new QLabel(QString::fromUtf8("引言"), page);
+    title->setGeometry(0, 54, 800, 56);
+    title->setAlignment(Qt::AlignCenter);
+    title->setStyleSheet("color: #fff4b8; background: transparent;");
+    title->setFont(QFont(QStringLiteral("Microsoft YaHei"), 28, QFont::Bold));
+
+    auto *placeholder = new QLabel(QString::fromUtf8("这里预留引言内容。\n后续可以改成文字排版，也可以直接替换为整张引言图片。"), page);
+    placeholder->setGeometry(110, 170, 580, 190);
+    placeholder->setAlignment(Qt::AlignCenter);
+    placeholder->setWordWrap(true);
+    placeholder->setStyleSheet(
+        "color: white;"
+        "background: rgba(255, 255, 255, 24);"
+        "border: 2px solid rgba(255, 244, 184, 150);"
+        "border-radius: 8px;"
+        "font-size: 22px;"
+        "line-height: 1.5;"
     );
-    return arrow;
+
+    auto *backButton = new QPushButton(QString::fromUtf8("返回"), page);
+    backButton->setObjectName("backButton");
+    backButton->setGeometry(190, 464, 170, 52);
+    backButton->setStyleSheet(
+        "QPushButton { background:#3d203e; color:#fff4b8; border:2px solid #fff4b8; border-radius:8px; font-size:22px; font-weight:700; }"
+        "QPushButton:hover { background:#57305a; }"
+    );
+
+    auto *enterGameButton = new QPushButton(QString::fromUtf8("开始游戏"), page);
+    enterGameButton->setObjectName("enterGameButton");
+    enterGameButton->setGeometry(440, 464, 170, 52);
+    enterGameButton->setStyleSheet(
+        "QPushButton { background:#49dada; color:#311b35; border:none; border-radius:8px; font-size:22px; font-weight:700; }"
+        "QPushButton:hover { background:#71eeee; }"
+    );
+
+    return page;
+}
+
+QWidget* MyWindow::createGuidePage(const QString& imageRes, const QString& fallbackText, const QString& buttonName) {
+    auto *page = new QWidget();
+    page->setFixedSize(800, 600);
+
+    auto *bgLabel = new QLabel(page);
+    bgLabel->setGeometry(0, 0, 800, 600);
+    QPixmap bg(imageRes);
+    if (!bg.isNull()) {
+        bgLabel->setPixmap(bg.scaled(800, 600, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
+    } else {
+        bgLabel->setStyleSheet("background-color: #210832;");
+
+        auto *placeholder = new QLabel(fallbackText, page);
+        placeholder->setGeometry(86, 110, 628, 300);
+        placeholder->setAlignment(Qt::AlignCenter);
+        placeholder->setWordWrap(true);
+        placeholder->setStyleSheet(
+            "color: #d7ff9a;"
+            "background: rgba(0, 0, 0, 70);"
+            "border: 2px solid rgba(215, 255, 154, 160);"
+            "border-radius: 8px;"
+            "font-size: 28px;"
+            "font-weight: 700;"
+            "line-height: 1.5;"
+        );
+    }
+
+    createNextButton(page, buttonName);
+    return page;
+}
+
+QPushButton* MyWindow::createTransparentButton(QWidget* parent, const QRect& geometry, const QString& objectName) {
+    auto *button = new QPushButton(parent);
+    button->setObjectName(objectName);
+    button->setGeometry(geometry);
+    button->setCursor(Qt::PointingHandCursor);
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setStyleSheet(
+        "QPushButton { background: transparent; border: none; }"
+        "QPushButton:hover { background: rgba(255, 255, 255, 28); border-radius: 8px; }"
+        "QPushButton:pressed { background: rgba(0, 0, 0, 28); border-radius: 8px; }"
+    );
+    return button;
+}
+
+QPushButton* MyWindow::createNextButton(QWidget* parent, const QString& objectName) {
+    auto *button = new QPushButton(QString::fromUtf8("➜"), parent);
+    button->setObjectName(objectName);
+    button->setGeometry(686, 480, 78, 78);
+    button->setCursor(Qt::PointingHandCursor);
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setStyleSheet(
+        "QPushButton { background:#ffb21c; color:white; border:none; border-radius:8px; font-size:42px; font-weight:900; }"
+        "QPushButton:hover { background:#ffc84a; }"
+        "QPushButton:pressed { background:#e69c12; }"
+    );
+    return button;
 }
 
 void MyWindow::switchToGameView() {

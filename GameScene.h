@@ -37,6 +37,12 @@ private:
         QString p1PickupText;
         QString p2PickupText;
         bool picked = false;
+        QGraphicsItem* visualItem = nullptr;
+    };
+    struct SwitchTrigger {
+        QRectF area;
+        QString triggerDialogue;
+        bool triggered = false;
         QGraphicsRectItem* visualItem = nullptr;
     };
 
@@ -50,6 +56,11 @@ private:
         QRectF goalRect;
         QVector<DialogueTrigger> dialogues;
         QVector<ItemTrigger> items;
+        QVector<SwitchTrigger> switches;
+        QVector<RectBlock> doors;
+        bool chaseWallEnabled = false;
+        QRectF chaseWallRect;
+        qreal chaseWallSpeed = 0.0;
     };
 
     void initLevels();
@@ -59,6 +70,7 @@ private:
     void checkDialogueTriggers();
     void checkSpikeCollisionAndRespawn();
     void checkItemPickups();
+    void updateLevelMechanics();
     void checkIdleDialogue();
     void showDialogue(const QString& text, int frames);
     int countUntriggeredDialogues(const LevelData& lv) const;
@@ -73,6 +85,9 @@ private:
 
     QVector<QGraphicsItem*> levelItems;
     QGraphicsRectItem *goalItem;
+    QVector<QGraphicsItem*> activeDoorItems;
+    QGraphicsRectItem *chaseWallItem;
+    bool chaseWallIntroShown;
 
     QGraphicsTextItem *dialogueTextItem;
     int dialogueFramesLeft;

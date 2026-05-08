@@ -3,6 +3,7 @@
 
 #include <QLabel>
 #include <QPushButton>
+#include <QRect>
 #include <QStackedWidget>
 #include <QWidget>
 
@@ -17,8 +18,11 @@ public:
     ~MyWindow() override;
 
 private:
-    QWidget* createIntroPage(const QString& backgroundRes, const QString& text, bool showStartButton);
-    QPushButton* createArrowButton(QWidget* parent);
+    QWidget* createCoverPage();
+    QWidget* createProloguePage();
+    QWidget* createGuidePage(const QString& imageRes, const QString& fallbackText, const QString& buttonName);
+    QPushButton* createTransparentButton(QWidget* parent, const QRect& geometry, const QString& objectName);
+    QPushButton* createNextButton(QWidget* parent, const QString& objectName);
     void switchToGameView();
 
     QStackedWidget* stacked;

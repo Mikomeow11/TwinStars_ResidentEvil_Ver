@@ -2,13 +2,10 @@
     <qresource prefix="/">
         <file>assets/tiles/ground_tile.png</file>
         <file>assets/backgrouds/level1_bg.png</file>
-        <file>assets/backgrouds/level2_bg.png</file>
         <file>assets/characters/p1_idle.png.png</file>
         <file>assets/characters/p2_idle.png.png</file>
-        <file>assets/items/herb.png</file>
         <file>assets/ui/start_page.png</file>
         <file>assets/ui/tutorial_p1.png</file>
         <file>assets/ui/tutorial_p2.png</file>
-        <file>assets/ui/story_page.png</file>
     </qresource>
 </RCC>

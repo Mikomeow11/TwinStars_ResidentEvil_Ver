@@ -5,6 +5,7 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsScene>
 #include <QGraphicsTextItem>
+#include <QQueue>
 #include <QSet>
 #include <QTimer>
 #include <QVector>
@@ -13,6 +14,9 @@ class GameScene : public QGraphicsScene {
     Q_OBJECT
 public:
     explicit GameScene(QObject *parent = nullptr);
+
+signals:
+    void gameCompleted(int herbsCollected, int totalHerbs, bool bearKeychainCollected, int deathCount);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -50,6 +54,7 @@ private:
         QSizeF mapSize;
         QPointF p1Spawn;
         QPointF p2Spawn;
+        QString openingDialogue;
         QVector<RectBlock> grounds;
         QVector<RectBlock> platforms;
         QVector<RectBlock> spikes;
@@ -73,6 +78,10 @@ private:
     void updateLevelMechanics();
     void checkIdleDialogue();
     void showDialogue(const QString& text, int frames);
+    void displayDialogueNow(const QString& text, int frames);
+    int adjustedDialogueFrames(const QString& text, int frames) const;
+    bool isSystemDialogue(const QString& text) const;
+    QString randomDialogue(const QVector<QString>& dialogues) const;
     int countUntriggeredDialogues(const LevelData& lv) const;
 
     Player *p1;
@@ -89,8 +98,10 @@ private:
     QGraphicsRectItem *chaseWallItem;
     bool chaseWallIntroShown;
 
+    QGraphicsRectItem *dialogueBoxItem;
     QGraphicsTextItem *dialogueTextItem;
     int dialogueFramesLeft;
+    QQueue<QPair<QString, int>> dialogueQueue;
     int goalLockHintCooldownFrames;
     QString pendingNextLevelDialogue;
 
@@ -98,6 +109,10 @@ private:
     bool p2ReachedGoal;
     bool firstArrivalDialogueDone;
     bool secondArrivalDialogueDone;
+    int totalHerbs;
+    int herbsCollected;
+    int deathCount;
+    bool bearKeychainCollected;
 
     QPointF p1LastPos;
     QPointF p2LastPos;

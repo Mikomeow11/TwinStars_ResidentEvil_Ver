@@ -35,17 +35,13 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         resources.qrc
     )
-# Define target properties for Android with Qt 6 as:
-#    set_property(TARGET TwinStars_ResidentEvil_ver APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-#                 ${CMAKE_CURRENT_SOURCE_DIR}/android)
-# For more information, see https://doc.qt.io/qt-6/qt-add-executable.html#target-creation
+# 如需移植到 Android，可在这里补充 Qt 6 的 Android 工程目录配置。
 else()
     if(ANDROID)
         add_library(TwinStars_ResidentEvil_ver SHARED
             ${PROJECT_SOURCES}
         )
-# Define properties for Android with Qt 5 after find_package() calls as:
-#    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
+# 如需使用 Qt 5 构建 Android 版本，可在这里设置 Android 工程目录。
     else()
         add_executable(TwinStars_ResidentEvil_ver
             ${PROJECT_SOURCES}
@@ -55,9 +51,7 @@ endif()
 
 target_link_libraries(TwinStars_ResidentEvil_ver PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If you are developing for iOS or macOS you should consider setting an
-# explicit, fixed bundle identifier manually though.
+# iOS/macOS 打包时建议设置固定的应用标识符。
 if(${QT_VERSION} VERSION_LESS 6.1.0)
   set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.TwinStars_ResidentEvil_ver)
 endif()

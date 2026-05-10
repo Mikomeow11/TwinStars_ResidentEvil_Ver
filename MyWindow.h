@@ -5,6 +5,7 @@
 #include <QPushButton>
 #include <QRect>
 #include <QStackedWidget>
+#include <QTimer>
 #include <QWidget>
 
 class QGraphicsView;
@@ -24,8 +25,15 @@ private:
     QPushButton* createTransparentButton(QWidget* parent, const QRect& geometry, const QString& objectName);
     QPushButton* createNextButton(QWidget* parent, const QString& objectName);
     void switchToGameView();
+    void showEndingTransition(int herbsCollected, int totalHerbs, bool bearKeychainCollected, int deathCount);
+    QWidget* createEndingTransitionPage(int herbsCollected, int totalHerbs, bool bearKeychainCollected, int deathCount);
+    QWidget* createEndingCreditsPage(int herbsCollected, int totalHerbs, bool bearKeychainCollected, int deathCount);
 
     QStackedWidget* stacked;
     QGraphicsView* gameView;
+    QWidget* endingTransitionPage;
+    QWidget* endingCreditsPage;
+    QWidget* endingCreditsContent;
+    QTimer* endingScrollTimer;
 };
 #endif // MYWINDOW_H

@@ -7,6 +7,10 @@
 #include <QKeyEvent>
 #include <QPen>
 #include <QPixmap>
+#include <QRandomGenerator>
+#include <QStringList>
+#include <QTextDocument>
+#include <QTextOption>
 #include <utility>
 
 GameScene::GameScene(QObject *parent)
@@ -18,6 +22,7 @@ GameScene::GameScene(QObject *parent)
       goalItem(nullptr),
       chaseWallItem(nullptr),
       chaseWallIntroShown(false),
+      dialogueBoxItem(new QGraphicsRectItem()),
       dialogueTextItem(new QGraphicsTextItem()),
       dialogueFramesLeft(0),
       goalLockHintCooldownFrames(0),
@@ -26,6 +31,10 @@ GameScene::GameScene(QObject *parent)
       p2ReachedGoal(false),
       firstArrivalDialogueDone(false),
       secondArrivalDialogueDone(false),
+      totalHerbs(0),
+      herbsCollected(0),
+      deathCount(0),
+      bearKeychainCollected(false),
       p1IdleFrames(0),
       p2IdleFrames(0),
       p1IdleHintUsed(false),
@@ -34,7 +43,15 @@ GameScene::GameScene(QObject *parent)
     addItem(p1);
     addItem(p2);
 
-    dialogueTextItem->setDefaultTextColor(Qt::white);
+    dialogueBoxItem->setBrush(QColor(0, 0, 0, 175));
+    dialogueBoxItem->setPen(QPen(QColor("#df9fb6"), 2));
+    dialogueBoxItem->setZValue(1999);
+    dialogueBoxItem->setVisible(false);
+    addItem(dialogueBoxItem);
+
+    dialogueTextItem->setDefaultTextColor(QColor("#fff4b8"));
+    dialogueTextItem->setTextWidth(680);
+    dialogueTextItem->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
     dialogueTextItem->setZValue(2000);
     dialogueTextItem->setVisible(false);
     addItem(dialogueTextItem);
@@ -48,11 +65,16 @@ GameScene::GameScene(QObject *parent)
 
 void GameScene::initLevels() {
     levels.clear();
+    totalHerbs = 0;
+    herbsCollected = 0;
+    deathCount = 0;
+    bearKeychainCollected = false;
 
     LevelData lv1;
     lv1.mapSize = QSizeF(2200, 600);
     lv1.p1Spawn = QPointF(100, 500);
     lv1.p2Spawn = QPointF(220, 500);
+    lv1.openingDialogue = QString::fromUtf8("里昂：这不是普通实验室，小心点。");
     lv1.grounds = {
         { QRectF(0, 560, 2200, 40) }
     };
@@ -65,10 +87,10 @@ void GameScene::initLevels() {
     };
     lv1.goalRect = QRectF(2060, 480, 60, 80);
     lv1.dialogues = {
-        // Trigger 1: must jump onto platform at x=620, y=420, w=220, h=20
-        { QRectF(620, 370, 220, 50), QString(), false },
-        // Trigger 2: must jump onto platform at x=1320, y=440, w=220, h=20
-        { QRectF(1320, 390, 220, 50), QString(), false }
+        // 第一处平台提示：玩家跳到该平台附近时触发。
+        { QRectF(620, 370, 220, 50), QString::fromUtf8("艾达：跳之前先看落点。"), false },
+        // 第二处平台提示：提醒玩家后续平台不稳定。
+        { QRectF(1320, 390, 220, 50), QString::fromUtf8("里昂：这些平台不太稳，别急着冲。"), false }
     };
     lv1.spikes = {};
     lv1.items = {
@@ -81,6 +103,7 @@ void GameScene::initLevels() {
     lv2.mapSize = QSizeF(2600, 600);
     lv2.p1Spawn = QPointF(80, 500);
     lv2.p2Spawn = QPointF(180, 500);
+    lv2.openingDialogue = QString::fromUtf8("艾达：地面有机关，别只顾着往前冲。");
     lv2.grounds = {
         { QRectF(0, 560, 2600, 40) }
     };
@@ -107,8 +130,9 @@ void GameScene::initLevels() {
     };
     lv2.goalRect = QRectF(2460, 480, 60, 80);
     lv2.dialogues = {
-        { QRectF(680, 0, 120, 600), QString(), false },
-        { QRectF(1960, 0, 120, 600), QString(), false }
+        { QRectF(380, 0, 160, 600), QString::fromUtf8("里昂：这些尖刺不是摆设。"), false },
+        { QRectF(680, 0, 120, 600), QString::fromUtf8("艾达：跳之前先看落点。"), false },
+        { QRectF(1960, 0, 120, 600), QString::fromUtf8("里昂：后半段更窄，稳一点。"), false }
     };
     lv2.items = {
         { QRectF(960, 315, 36, 36), QString("herb"), QString::fromUtf8("里昂：草药，拿着吧。"), QString::fromUtf8("艾达：草药，收好了。"), false, nullptr },
@@ -117,21 +141,26 @@ void GameScene::initLevels() {
     levels.push_back(lv2);
 
     LevelData lv3;
-    lv3.mapSize = QSizeF(3000, 600);
-    lv3.p1Spawn = QPointF(80, 500);
-    lv3.p2Spawn = QPointF(180, 500);
+    lv3.mapSize = QSizeF(3400, 600);
+    lv3.p1Spawn = QPointF(460, 500);
+    lv3.p2Spawn = QPointF(560, 500);
+    lv3.openingDialogue = QString::fromUtf8("里昂：看来这门需要两边同时解锁。");
     lv3.grounds = {
-        { QRectF(0, 560, 3000, 40) }
+        { QRectF(0, 560, 3400, 40) }
     };
     lv3.platforms = {
-        { QRectF(320, 485, 180, 20) },
+        { QRectF(310, 500, 110, 20) },
+        { QRectF(160, 455, 110, 20) },
+        { QRectF(20, 405, 110, 20) },
+        { QRectF(620, 485, 180, 20) },
         { QRectF(620, 420, 180, 20) },
         { QRectF(940, 360, 190, 20) },
         { QRectF(1260, 300, 180, 20) },
         { QRectF(1580, 355, 180, 20) },
         { QRectF(1820, 500, 220, 20) },
         { QRectF(2140, 440, 220, 20) },
-        { QRectF(2480, 390, 180, 20) }
+        { QRectF(2480, 390, 180, 20) },
+        { QRectF(2820, 455, 200, 20) }
     };
     lv3.spikes = {
         { QRectF(760, 530, 36, 30) },
@@ -139,12 +168,16 @@ void GameScene::initLevels() {
         { QRectF(2040, 530, 36, 30) },
         { QRectF(2076, 530, 36, 30) }
     };
-    lv3.goalRect = QRectF(2860, 480, 60, 80);
+    lv3.goalRect = QRectF(3260, 480, 60, 80);
     lv3.dialogues = {
+        { QRectF(300, 0, 120, 600), QString::fromUtf8("艾达：往回走？你发现什么了？"), false },
         { QRectF(520, 0, 120, 600), QString::fromUtf8("艾达：前面分路，别跟丢了。"), false },
-        { QRectF(2320, 0, 120, 600), QString::fromUtf8("里昂：出口就在前面，先把门打开。"), false }
+        { QRectF(1280, 0, 180, 600), QString::fromUtf8("系统：检测到双人权限缺失。"), false },
+        { QRectF(2120, 0, 160, 600), QString::fromUtf8("艾达：门锁在另一边。"), false },
+        { QRectF(2720, 0, 120, 600), QString::fromUtf8("里昂：出口就在前面，先把门打开。"), false }
     };
     lv3.items = {
+        { QRectF(56, 365, 36, 36), QString("bear_keychain"), QString::fromUtf8("艾达：看来某人旧情难忘啊。\n里昂：我只是习惯把重要的东西带在身上。"), QString(), false, nullptr },
         { QRectF(1580, 315, 36, 36), QString("herb"), QString::fromUtf8("里昂：这里还有补给。"), QString::fromUtf8("艾达：拿上，后面用得着。"), false, nullptr }
     };
     lv3.switches = {
@@ -152,7 +185,7 @@ void GameScene::initLevels() {
         { QRectF(2200, 400, 64, 28), QString::fromUtf8("艾达：别急，我找到控制台了。"), false, nullptr }
     };
     lv3.doors = {
-        { QRectF(2700, 360, 52, 200) }
+        { QRectF(3100, 360, 52, 200) }
     };
     levels.push_back(lv3);
 
@@ -160,6 +193,7 @@ void GameScene::initLevels() {
     lv4.mapSize = QSizeF(3200, 600);
     lv4.p1Spawn = QPointF(110, 500);
     lv4.p2Spawn = QPointF(210, 500);
+    lv4.openingDialogue = QString::fromUtf8("系统：自毁程序已启动。");
     lv4.grounds = {
         { QRectF(0, 560, 3200, 40) }
     };
@@ -183,7 +217,9 @@ void GameScene::initLevels() {
     };
     lv4.goalRect = QRectF(3060, 480, 60, 80);
     lv4.dialogues = {
-        { QRectF(220, 0, 120, 600), QString::fromUtf8("系统：实验室自毁程序启动。"), false },
+        { QRectF(220, 0, 120, 600), QString::fromUtf8("艾达：别停，后面的东西追上来就麻烦了。"), false },
+        { QRectF(740, 0, 140, 600), QString::fromUtf8("里昂：这些尖刺不是摆设。"), false },
+        { QRectF(1220, 0, 140, 600), QString::fromUtf8("艾达：跳之前先看落点。"), false },
         { QRectF(1760, 0, 120, 600), QString::fromUtf8("里昂：快走，后面撑不住了！"), false }
     };
     lv4.items = {
@@ -193,6 +229,14 @@ void GameScene::initLevels() {
     lv4.chaseWallRect = QRectF(-180, 0, 90, 600);
     lv4.chaseWallSpeed = 1.35;
     levels.push_back(lv4);
+
+    for (const LevelData &level : std::as_const(levels)) {
+        for (const ItemTrigger &item : level.items) {
+            if (item.itemType == QString("herb")) {
+                ++totalHerbs;
+            }
+        }
+    }
 }
 
 void GameScene::loadLevel(int levelIndex) {
@@ -205,6 +249,7 @@ void GameScene::loadLevel(int levelIndex) {
 
     keys.clear();
     dialogueFramesLeft = 0;
+    dialogueQueue.clear();
     goalLockHintCooldownFrames = 0;
     p1ReachedGoal = false;
     p2ReachedGoal = false;
@@ -214,6 +259,7 @@ void GameScene::loadLevel(int levelIndex) {
     p2IdleFrames = 0;
     p1IdleHintUsed = false;
     p2IdleHintUsed = false;
+    dialogueBoxItem->setVisible(false);
     dialogueTextItem->setVisible(false);
 
     for (QGraphicsItem* item : std::as_const(levelItems)) {
@@ -233,6 +279,10 @@ void GameScene::loadLevel(int levelIndex) {
         backgroundPath = ":/assets/backgrouds/level1_bg.png";
     } else if (currentLevelIndex == 1) {
         backgroundPath = ":/assets/backgrouds/level2_bg.png";
+    } else if (currentLevelIndex == 2) {
+        backgroundPath = ":/assets/backgrouds/level3_bg.png";
+    } else if (currentLevelIndex == 3) {
+        backgroundPath = ":/assets/backgrouds/level4_bg.png";
     }
 
     if (!backgroundPath.isEmpty()) {
@@ -244,7 +294,7 @@ void GameScene::loadLevel(int levelIndex) {
             levelItems.push_back(bgItem);
             addItem(bgItem);
         } else {
-            showDialogue(QString("Background load failed: %1").arg(backgroundPath), 180);
+            showDialogue(QString::fromUtf8("背景加载失败：%1").arg(backgroundPath), 180);
         }
     }
 
@@ -270,7 +320,8 @@ void GameScene::loadLevel(int levelIndex) {
     for (ItemTrigger &it : lv.items) {
         it.picked = false;
         it.visualItem = nullptr;
-        QPixmap itemPixmap(":/assets/items/herb.png");
+        const bool isBearKeychain = it.itemType == QString("bear_keychain");
+        QPixmap itemPixmap(isBearKeychain ? QString(":/assets/items/bear_keychain.png") : QString(":/assets/items/herb.png"));
         QGraphicsItem* itemVisual = nullptr;
         if (!itemPixmap.isNull()) {
             auto *pixmapItem = new QGraphicsPixmapItem(
@@ -285,8 +336,8 @@ void GameScene::loadLevel(int levelIndex) {
             itemVisual = pixmapItem;
         } else {
             auto *itemRect = new QGraphicsRectItem(it.area);
-            itemRect->setBrush(QColor(255, 220, 80, 200));
-            itemRect->setPen(QPen(Qt::NoPen));
+            itemRect->setBrush(isBearKeychain ? QColor(255, 190, 80, 220) : QColor(255, 220, 80, 200));
+            itemRect->setPen(isBearKeychain ? QPen(QColor(255, 245, 170), 2) : QPen(Qt::NoPen));
             itemRect->setZValue(30);
             itemVisual = itemRect;
         }
@@ -344,6 +395,8 @@ void GameScene::loadLevel(int levelIndex) {
     if (!pendingNextLevelDialogue.isEmpty()) {
         showDialogue(pendingNextLevelDialogue, 120);
         pendingNextLevelDialogue.clear();
+    } else if (!lv.openingDialogue.isEmpty()) {
+        showDialogue(lv.openingDialogue, 140);
     }
 }
 
@@ -370,7 +423,13 @@ void GameScene::mainGameLoop() {
     if (dialogueFramesLeft > 0) {
         --dialogueFramesLeft;
         if (dialogueFramesLeft == 0) {
-            dialogueTextItem->setVisible(false);
+            if (!dialogueQueue.isEmpty()) {
+                const auto next = dialogueQueue.dequeue();
+                displayDialogueNow(next.first, next.second);
+            } else {
+                dialogueBoxItem->setVisible(false);
+                dialogueTextItem->setVisible(false);
+            }
         }
     }
 
@@ -408,6 +467,11 @@ void GameScene::checkGoalAndMaybeSwitchLevel() {
     if (p1AtGoal && p2AtGoal && !p1ReachedGoal && !p2ReachedGoal) {
         p1ReachedGoal = true;
         p2ReachedGoal = true;
+        if (currentLevelIndex == levels.size() - 1) {
+            gameTimer->stop();
+            emit gameCompleted(herbsCollected, totalHerbs, bearKeychainCollected, deathCount);
+            return;
+        }
         pendingNextLevelDialogue = QString::fromUtf8("里昂：配合不错。\n艾达：别停，下一段才麻烦。");
         loadLevel(currentLevelIndex + 1);
         return;
@@ -455,6 +519,11 @@ void GameScene::checkGoalAndMaybeSwitchLevel() {
     }
 
     if (p1ReachedGoal && p2ReachedGoal) {
+        if (currentLevelIndex == levels.size() - 1) {
+            gameTimer->stop();
+            emit gameCompleted(herbsCollected, totalHerbs, bearKeychainCollected, deathCount);
+            return;
+        }
         loadLevel(currentLevelIndex + 1);
     }
 }
@@ -478,9 +547,48 @@ void GameScene::checkDialogueTriggers() {
 }
 
 void GameScene::showDialogue(const QString& text, int frames) {
+    if (text.isEmpty()) {
+        return;
+    }
+    const int finalFrames = adjustedDialogueFrames(text, frames);
+    if (dialogueFramesLeft > 0 || dialogueTextItem->isVisible()) {
+        if (dialogueQueue.size() < 6) {
+            dialogueQueue.enqueue(qMakePair(text, finalFrames));
+        }
+        return;
+    }
+    displayDialogueNow(text, finalFrames);
+}
+
+void GameScene::displayDialogueNow(const QString& text, int frames) {
+    QFont dialogueFont = dialogueTextItem->font();
+    dialogueFont.setBold(isSystemDialogue(text));
+    dialogueTextItem->setFont(dialogueFont);
+    dialogueTextItem->setDefaultTextColor(isSystemDialogue(text) ? QColor("#ff3b30") : QColor("#fff4b8"));
     dialogueTextItem->setPlainText(text);
+    dialogueBoxItem->setVisible(true);
     dialogueTextItem->setVisible(true);
     dialogueFramesLeft = frames;
+}
+
+int GameScene::adjustedDialogueFrames(const QString& text, int frames) const {
+    const int lineCount = text.count('\n') + 1;
+    const int lengthBonus = qMin(120, text.size() * 2);
+    const int minFrames = lineCount >= 2 ? 220 : 160;
+    return qMax(frames + lengthBonus, minFrames);
+}
+
+bool GameScene::isSystemDialogue(const QString& text) const {
+    const QString trimmed = text.trimmed();
+    return trimmed.startsWith(QString::fromUtf8("系统："));
+}
+
+QString GameScene::randomDialogue(const QVector<QString>& dialogues) const {
+    if (dialogues.isEmpty()) {
+        return QString();
+    }
+    const int index = QRandomGenerator::global()->bounded(dialogues.size());
+    return dialogues.at(index);
 }
 
 void GameScene::checkSpikeCollisionAndRespawn() {
@@ -510,6 +618,13 @@ void GameScene::checkSpikeCollisionAndRespawn() {
     }
 
     if (p1Hit) {
+        ++deathCount;
+    }
+    if (p2Hit) {
+        ++deathCount;
+    }
+
+    if (p1Hit) {
         p1->setPos(lv.p1Spawn);
     }
     if (p2Hit) {
@@ -517,11 +632,29 @@ void GameScene::checkSpikeCollisionAndRespawn() {
     }
 
     if (p1Hit && p2Hit) {
-        showDialogue(QString::fromUtf8("里昂：相互靠着走，别倒在我前面。\n艾达：看来我们今天都没法逞强了。"), 120);
+        const QVector<QString> leonLines = {
+            QString::fromUtf8("里昂：相互靠着走，别倒在我前面。"),
+            QString::fromUtf8("里昂：还没结束，别再丢下我一个人。"),
+            QString::fromUtf8("里昂：你可不像是会轻易认输的人。")
+        };
+        const QVector<QString> adaLines = {
+            QString::fromUtf8("艾达：清醒点，你的命还欠在我手上。"),
+            QString::fromUtf8("艾达：别倒下，我可不想白来一趟。"),
+            QString::fromUtf8("艾达：你最好不是故意的。")
+        };
+        showDialogue(randomDialogue(leonLines) + "\n" + randomDialogue(adaLines), 120);
     } else if (p1Hit) {
-        showDialogue(QString::fromUtf8("艾达：清醒点，你的命还欠在我手上。"), 120);
+        showDialogue(randomDialogue({
+            QString::fromUtf8("艾达：清醒点，你的命还欠在我手上。"),
+            QString::fromUtf8("艾达：别倒下，我可不想白来一趟。"),
+            QString::fromUtf8("艾达：你最好不是故意的。")
+        }), 120);
     } else {
-        showDialogue(QString::fromUtf8("里昂：这次我带你出去。"), 120);
+        showDialogue(randomDialogue({
+            QString::fromUtf8("里昂：相互靠着走，别倒在我前面。"),
+            QString::fromUtf8("里昂：还没结束，别再丢下我一个人。"),
+            QString::fromUtf8("里昂：你可不像是会轻易认输的人。")
+        }), 120);
     }
 }
 
@@ -538,16 +671,38 @@ void GameScene::checkItemPickups() {
         const bool p2Pick = p2Rect.intersects(it.area);
         if (p1Pick || p2Pick) {
             it.picked = true;
+            if (it.itemType == QString("herb")) {
+                ++herbsCollected;
+            } else if (it.itemType == QString("bear_keychain")) {
+                bearKeychainCollected = true;
+            }
             if (it.visualItem) {
                 removeItem(it.visualItem);
                 it.visualItem = nullptr;
             }
-            if (p1Pick && !it.p1PickupText.isEmpty()) {
-                showDialogue(it.p1PickupText, 110);
-            } else if (p2Pick && !it.p2PickupText.isEmpty()) {
-                showDialogue(it.p2PickupText, 110);
+            if (it.itemType == QString("bear_keychain")) {
+                if (!it.p1PickupText.isEmpty()) {
+                    const QStringList lines = it.p1PickupText.split('\n', Qt::SkipEmptyParts);
+                    for (const QString &line : lines) {
+                        showDialogue(line.trimmed(), 140);
+                    }
+                } else {
+                    showDialogue(QString::fromUtf8("小熊钥匙扣：一枚被仔细保存的信物。"), 140);
+                }
+            } else if (p1Pick) {
+                showDialogue(randomDialogue({
+                    QString::fromUtf8("里昂：草药，这可是好东西。"),
+                    QString::fromUtf8("里昂：留着，后面说不定用得上。"),
+                    QString::fromUtf8("里昂：补给不多，先收起来。")
+                }), 110);
+            } else if (p2Pick) {
+                showDialogue(randomDialogue({
+                    QString::fromUtf8("艾达：补给不多，别浪费。"),
+                    QString::fromUtf8("艾达：看来运气还没完全站在我们对面。"),
+                    QString::fromUtf8("艾达：草药，收好了。")
+                }), 110);
             } else {
-                showDialogue(QString("Picked item: %1").arg(it.itemType), 110);
+                showDialogue(QString::fromUtf8("拾取道具：%1").arg(it.itemType), 110);
             }
         }
     }
@@ -604,6 +759,13 @@ void GameScene::updateLevelMechanics() {
     }
 
     if (p1Hit) {
+        ++deathCount;
+    }
+    if (p2Hit) {
+        ++deathCount;
+    }
+
+    if (p1Hit) {
         p1->setPos(lv.p1Spawn);
     }
     if (p2Hit) {
@@ -613,11 +775,27 @@ void GameScene::updateLevelMechanics() {
     chaseWallIntroShown = false;
 
     if (p1Hit && p2Hit) {
-        showDialogue(QString::fromUtf8("艾达：看来我们今天都没法逞强了。"), 120);
+        showDialogue(randomDialogue({
+            QString::fromUtf8("里昂：相互靠着走，别倒在我前面。"),
+            QString::fromUtf8("里昂：还没结束，别再丢下我一个人。"),
+            QString::fromUtf8("里昂：你可不像是会轻易认输的人。")
+        }) + "\n" + randomDialogue({
+            QString::fromUtf8("艾达：清醒点，你的命还欠在我手上。"),
+            QString::fromUtf8("艾达：别倒下，我可不想白来一趟。"),
+            QString::fromUtf8("艾达：你最好不是故意的。")
+        }), 120);
     } else if (p1Hit) {
-        showDialogue(QString::fromUtf8("艾达：里昂，别被它追上。"), 120);
+        showDialogue(randomDialogue({
+            QString::fromUtf8("艾达：清醒点，你的命还欠在我手上。"),
+            QString::fromUtf8("艾达：别倒下，我可不想白来一趟。"),
+            QString::fromUtf8("艾达：你最好不是故意的。")
+        }), 120);
     } else {
-        showDialogue(QString::fromUtf8("里昂：艾达，快回来！"), 120);
+        showDialogue(randomDialogue({
+            QString::fromUtf8("里昂：相互靠着走，别倒在我前面。"),
+            QString::fromUtf8("里昂：还没结束，别再丢下我一个人。"),
+            QString::fromUtf8("里昂：你可不像是会轻易认输的人。")
+        }), 120);
     }
 }
 
@@ -690,6 +868,13 @@ void GameScene::updateCamera() {
     view->centerOn(cx, cy);
 
     if (dialogueTextItem->isVisible()) {
-        dialogueTextItem->setPos(cx - halfW + 20, cy - halfH + 16);
+        const qreal boxWidth = qBound<qreal>(360, viewRect.width() * 0.72, 620);
+        const qreal boxHeight = 72;
+        const qreal boxX = cx - boxWidth * 0.5;
+        const qreal boxY = cy + halfH - 98;
+        dialogueBoxItem->setRect(0, 0, boxWidth, boxHeight);
+        dialogueBoxItem->setPos(boxX, boxY);
+        dialogueTextItem->setTextWidth(boxWidth - 32);
+        dialogueTextItem->setPos(boxX + 16, boxY + 11);
     }
 }

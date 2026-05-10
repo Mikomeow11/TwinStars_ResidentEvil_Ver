@@ -10,5 +10,9 @@
         <file>assets/ui/tutorial_p1.png</file>
         <file>assets/ui/tutorial_p2.png</file>
         <file>assets/ui/story_page.png</file>
+        <file>assets/backgrouds/level3_bg.png</file>
+        <file>assets/backgrouds/level4_bg.png</file>
+        <file>assets/items/bear_keychain.png</file>
+        <file>assets/ui/guests/guest_01.png</file>
     </qresource>
 </RCC>

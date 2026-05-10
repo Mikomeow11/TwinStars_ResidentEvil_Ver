@@ -36,7 +36,7 @@ Player::Player(int id, QColor color, QGraphicsItem *parent)
         spriteItem->setPixmap(sprite.scaled(rect().width(), rect().height(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
         spriteItem->setPos(0, 0);
     } else {
-        // Fallback: keep old colored rectangle when sprite loading fails.
+        // 立绘加载失败时，用纯色矩形作为备用显示。
         setBrush(QBrush(color));
     }
 }

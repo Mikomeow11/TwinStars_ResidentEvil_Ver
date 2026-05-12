@@ -9,6 +9,7 @@
 #include <QWidget>
 
 class QGraphicsView;
+class GameScene;
 
 class MyWindow : public QWidget
 {
@@ -22,6 +23,7 @@ private:
     QWidget* createCoverPage();
     QWidget* createProloguePage();
     QWidget* createGuidePage(const QString& imageRes, const QString& fallbackText, const QString& buttonName);
+    QWidget* createPausePage();
     QPushButton* createTransparentButton(QWidget* parent, const QRect& geometry, const QString& objectName);
     QPushButton* createNextButton(QWidget* parent, const QString& objectName);
     void switchToGameView();
@@ -31,6 +33,8 @@ private:
 
     QStackedWidget* stacked;
     QGraphicsView* gameView;
+    GameScene* gameScene;
+    QWidget* pausePage;
     QWidget* endingTransitionPage;
     QWidget* endingCreditsPage;
     QWidget* endingCreditsContent;

@@ -3,6 +3,7 @@
 #include "Ground.h"
 #include "Platform.h"
 #include "Spike.h"
+#include <QFont>
 #include <QGraphicsView>
 #include <QKeyEvent>
 #include <QPen>
@@ -24,6 +25,8 @@ GameScene::GameScene(QObject *parent)
       chaseWallIntroShown(false),
       dialogueBoxItem(new QGraphicsRectItem()),
       dialogueTextItem(new QGraphicsTextItem()),
+      hudBoxItem(new QGraphicsRectItem()),
+      hudTextItem(new QGraphicsTextItem()),
       dialogueFramesLeft(0),
       goalLockHintCooldownFrames(0),
       pendingNextLevelDialogue(""),
@@ -40,30 +43,80 @@ GameScene::GameScene(QObject *parent)
       p1IdleHintUsed(false),
       p2IdleHintUsed(false)
 {
+    // GameScene 是游戏核心场景，负责玩家、关卡物体、对白、HUD 和每帧游戏逻辑。
     addItem(p1);
     addItem(p2);
 
+    // 对白 UI：用半透明黑底和文字项叠在场景上，Z 值较高，保证显示在地图和角色上方。
     dialogueBoxItem->setBrush(QColor(0, 0, 0, 175));
-    dialogueBoxItem->setPen(QPen(QColor("#df9fb6"), 2));
+    dialogueBoxItem->setPen(QPen(QColor(223, 159, 182), 2));
     dialogueBoxItem->setZValue(1999);
     dialogueBoxItem->setVisible(false);
     addItem(dialogueBoxItem);
 
-    dialogueTextItem->setDefaultTextColor(QColor("#fff4b8"));
+    dialogueTextItem->setDefaultTextColor(QColor(255, 244, 184));
     dialogueTextItem->setTextWidth(680);
     dialogueTextItem->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
     dialogueTextItem->setZValue(2000);
     dialogueTextItem->setVisible(false);
     addItem(dialogueTextItem);
 
+    // HUD 显示在右上角：当前关卡、草药收集数、死亡次数都会在 updateHud 中刷新。
+    hudBoxItem->setBrush(QColor(0, 0, 0, 155));
+    hudBoxItem->setPen(QPen(QColor(223, 159, 182), 2));
+    hudBoxItem->setRect(0, 0, 210, 72);
+    hudBoxItem->setZValue(2100);
+    addItem(hudBoxItem);
+
+    hudTextItem->setDefaultTextColor(QColor(255, 244, 184));
+    hudTextItem->setTextWidth(190);
+    hudTextItem->setFont(QFont(QStringLiteral("Microsoft YaHei"), 13, QFont::Bold));
+    hudTextItem->setZValue(2101);
+    addItem(hudTextItem);
+
     initLevels();
     loadLevel(0);
 
+    // 16ms 约等于 60 FPS，mainGameLoop 就是本项目的游戏主循环。
     connect(gameTimer, &QTimer::timeout, this, &GameScene::mainGameLoop);
     gameTimer->start(16);
 }
 
+void GameScene::pauseGame() {
+    gameTimer->stop();
+    keys.clear();
+}
+
+void GameScene::resumeGame() {
+    if (!gameTimer->isActive()) {
+        gameTimer->start(16);
+    }
+}
+
+void GameScene::stopGame() {
+    gameTimer->stop();
+    keys.clear();
+}
+
+void GameScene::restartCurrentLevel() {
+    // 重开本关时，如果本关已经捡过道具，需要把对应统计回退，避免重复累计。
+    const int levelIndex = currentLevelIndex;
+    for (const ItemTrigger &item : std::as_const(levels[levelIndex].items)) {
+        if (!item.picked) {
+            continue;
+        }
+        if (item.itemType == QString("herb")) {
+            herbsCollected = qMax(0, herbsCollected - 1);
+        } else if (item.itemType == QString("bear_keychain")) {
+            bearKeychainCollected = false;
+        }
+    }
+    loadLevel(levelIndex);
+    resumeGame();
+}
+
 void GameScene::initLevels() {
+    // 关卡数据集中定义在这里：地图大小、出生点、地面、平台、尖刺、终点、道具、对白和机关都写成结构体数据。
     levels.clear();
     totalHerbs = 0;
     herbsCollected = 0;
@@ -71,6 +124,7 @@ void GameScene::initLevels() {
     bearKeychainCollected = false;
 
     LevelData lv1;
+    // 第一关：教学关，主要让玩家熟悉双人移动、跳平台和终点规则。
     lv1.mapSize = QSizeF(2200, 600);
     lv1.p1Spawn = QPointF(100, 500);
     lv1.p2Spawn = QPointF(220, 500);
@@ -100,6 +154,7 @@ void GameScene::initLevels() {
     levels.push_back(lv1);
 
     LevelData lv2;
+    // 第二关：加入尖刺陷阱，玩家碰到尖刺会回到出生点并增加死亡次数。
     lv2.mapSize = QSizeF(2600, 600);
     lv2.p1Spawn = QPointF(80, 500);
     lv2.p2Spawn = QPointF(180, 500);
@@ -141,6 +196,7 @@ void GameScene::initLevels() {
     levels.push_back(lv2);
 
     LevelData lv3;
+    // 第三关：加入双人机关门，同时左侧隐藏路线放了“小熊钥匙扣”彩蛋。
     lv3.mapSize = QSizeF(3400, 600);
     lv3.p1Spawn = QPointF(460, 500);
     lv3.p2Spawn = QPointF(560, 500);
@@ -181,6 +237,7 @@ void GameScene::initLevels() {
         { QRectF(1580, 315, 36, 36), QString("herb"), QString::fromUtf8("里昂：这里还有补给。"), QString::fromUtf8("艾达：拿上，后面用得着。"), false, nullptr }
     };
     lv3.switches = {
+        // 两个开关都触发后，activeDoorItems 中的门才会被移除。
         { QRectF(1320, 260, 64, 28), QString::fromUtf8("里昂：这边的门锁松动了。"), false, nullptr },
         { QRectF(2200, 400, 64, 28), QString::fromUtf8("艾达：别急，我找到控制台了。"), false, nullptr }
     };
@@ -190,6 +247,7 @@ void GameScene::initLevels() {
     levels.push_back(lv3);
 
     LevelData lv4;
+    // 第四关：最终逃亡关，加入从左侧推进的追逐墙，制造结尾压力。
     lv4.mapSize = QSizeF(3200, 600);
     lv4.p1Spawn = QPointF(110, 500);
     lv4.p2Spawn = QPointF(210, 500);
@@ -230,6 +288,7 @@ void GameScene::initLevels() {
     lv4.chaseWallSpeed = 1.35;
     levels.push_back(lv4);
 
+    // 统计整局草药总数，结算页会用 herbsCollected / totalHerbs 显示完成度。
     for (const LevelData &level : std::as_const(levels)) {
         for (const ItemTrigger &item : level.items) {
             if (item.itemType == QString("herb")) {
@@ -240,6 +299,7 @@ void GameScene::initLevels() {
 }
 
 void GameScene::loadLevel(int levelIndex) {
+    // 加载关卡：先清理旧关卡物体，再根据 LevelData 重新生成地图元素。
     if (levels.isEmpty()) {
         return;
     }
@@ -247,6 +307,7 @@ void GameScene::loadLevel(int levelIndex) {
     currentLevelIndex = (levelIndex % levels.size() + levels.size()) % levels.size();
     LevelData &lv = levels[currentLevelIndex];
 
+    // 每次进关都重置临时状态，避免上一关的按键、对白、终点状态影响下一关。
     keys.clear();
     dialogueFramesLeft = 0;
     dialogueQueue.clear();
@@ -262,6 +323,7 @@ void GameScene::loadLevel(int levelIndex) {
     dialogueBoxItem->setVisible(false);
     dialogueTextItem->setVisible(false);
 
+    // 移除上一关动态创建的地面、平台、尖刺、道具、门、背景等图元。
     for (QGraphicsItem* item : std::as_const(levelItems)) {
         removeItem(item);
         delete item;
@@ -274,6 +336,7 @@ void GameScene::loadLevel(int levelIndex) {
 
     setSceneRect(0, 0, lv.mapSize.width(), lv.mapSize.height());
 
+    // 根据当前关卡选择背景图，资源路径来自 resources.qrc。
     QString backgroundPath;
     if (currentLevelIndex == 0) {
         backgroundPath = ":/assets/backgrouds/level1_bg.png";
@@ -298,6 +361,7 @@ void GameScene::loadLevel(int levelIndex) {
         }
     }
 
+    // 地面和平台是主要碰撞物，Player.cpp 会根据它们分别处理实心地板和单向平台。
     for (const RectBlock &g : std::as_const(lv.grounds)) {
         auto *ground = new Ground(g.rect.x(), g.rect.y(), g.rect.width(), g.rect.height());
         levelItems.push_back(ground);
@@ -310,6 +374,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(platform);
     }
 
+    // 尖刺是危险物，碰撞检测在 checkSpikeCollisionAndRespawn 中完成。
     for (const RectBlock &s : std::as_const(lv.spikes)) {
         auto *spike = new Spike(s.rect.x(), s.rect.y(), s.rect.width(), s.rect.height());
         spike->setZValue(20);
@@ -317,6 +382,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(spike);
     }
 
+    // 道具生成：草药和小熊钥匙扣用不同资源图；如果图片失败，则用色块兜底。
     for (ItemTrigger &it : lv.items) {
         it.picked = false;
         it.visualItem = nullptr;
@@ -346,6 +412,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(itemVisual);
     }
 
+    // 机关按钮：第三关需要两个按钮都踩到，门才会打开。
     for (SwitchTrigger &sw : lv.switches) {
         sw.triggered = false;
         auto *switchItem = new QGraphicsRectItem(sw.area);
@@ -357,6 +424,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(switchItem);
     }
 
+    // 机关门本质上也是平台碰撞体，打开时从场景和 levelItems 中删除。
     for (const RectBlock &door : std::as_const(lv.doors)) {
         auto *doorItem = new Platform(door.rect.x(), door.rect.y(), door.rect.width(), door.rect.height());
         doorItem->setBrush(QColor(80, 30, 120, 220));
@@ -367,6 +435,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(doorItem);
     }
 
+    // 追逐墙：第四关启用，会在 updateLevelMechanics 中每帧向右推进。
     if (lv.chaseWallEnabled) {
         chaseWallItem = new QGraphicsRectItem(lv.chaseWallRect);
         chaseWallItem->setBrush(QColor(220, 20, 45, 120));
@@ -376,6 +445,7 @@ void GameScene::loadLevel(int levelIndex) {
         addItem(chaseWallItem);
     }
 
+    // 终点区域：两个玩家都到达后才会进入下一关或通关结算。
     goalItem = new QGraphicsRectItem(lv.goalRect);
     goalItem->setBrush(QColor(100, 220, 120, 180));
     goalItem->setPen(QPen(Qt::NoPen));
@@ -387,6 +457,7 @@ void GameScene::loadLevel(int levelIndex) {
         d.triggered = false;
     }
 
+    // 玩家回到本关出生点，并播放开场对白或上一关过渡对白。
     p1->setPos(lv.p1Spawn);
     p2->setPos(lv.p2Spawn);
     p1LastPos = p1->pos();
@@ -401,6 +472,12 @@ void GameScene::loadLevel(int levelIndex) {
 }
 
 void GameScene::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Escape) {
+        pauseGame();
+        emit pauseRequested();
+        event->accept();
+        return;
+    }
     keys.insert(event->key());
 }
 
@@ -409,6 +486,7 @@ void GameScene::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void GameScene::mainGameLoop() {
+    // 主循环每帧执行：移动玩家 -> 检测关卡事件 -> 更新镜头和 HUD -> 推进对白计时。
     p1->updatePosition(keys);
     p2->updatePosition(keys);
 
@@ -419,8 +497,10 @@ void GameScene::mainGameLoop() {
     checkSpikeCollisionAndRespawn();
     checkIdleDialogue();
     updateCamera();
+    updateHud();
 
     if (dialogueFramesLeft > 0) {
+        // 当前对白结束后，如果队列里还有对白，就继续播放下一句，避免多条提示互相覆盖。
         --dialogueFramesLeft;
         if (dialogueFramesLeft == 0) {
             if (!dialogueQueue.isEmpty()) {
@@ -439,6 +519,7 @@ void GameScene::mainGameLoop() {
 }
 
 void GameScene::checkGoalAndMaybeSwitchLevel() {
+    // 终点判定：两名玩家都进入终点区域，才算完成当前关卡。
     if (!goalItem) {
         return;
     }
@@ -529,6 +610,7 @@ void GameScene::checkGoalAndMaybeSwitchLevel() {
 }
 
 void GameScene::checkDialogueTriggers() {
+    // 区域对白触发：玩家一进入指定矩形区域后，触发一次提示对白。
     LevelData &lv = levels[currentLevelIndex];
     const QRectF p1Rect = p1->sceneBoundingRect();
 
@@ -547,6 +629,7 @@ void GameScene::checkDialogueTriggers() {
 }
 
 void GameScene::showDialogue(const QString& text, int frames) {
+    // 对外统一调用的对白入口：如果当前正在显示对白，就排队等待播放。
     if (text.isEmpty()) {
         return;
     }
@@ -561,10 +644,11 @@ void GameScene::showDialogue(const QString& text, int frames) {
 }
 
 void GameScene::displayDialogueNow(const QString& text, int frames) {
+    // 系统提示以“系统：”开头，会自动变成红色加粗，和角色对白区分开。
     QFont dialogueFont = dialogueTextItem->font();
     dialogueFont.setBold(isSystemDialogue(text));
     dialogueTextItem->setFont(dialogueFont);
-    dialogueTextItem->setDefaultTextColor(isSystemDialogue(text) ? QColor("#ff3b30") : QColor("#fff4b8"));
+    dialogueTextItem->setDefaultTextColor(isSystemDialogue(text) ? QColor(255, 59, 48) : QColor(255, 244, 184));
     dialogueTextItem->setPlainText(text);
     dialogueBoxItem->setVisible(true);
     dialogueTextItem->setVisible(true);
@@ -592,6 +676,7 @@ QString GameScene::randomDialogue(const QVector<QString>& dialogues) const {
 }
 
 void GameScene::checkSpikeCollisionAndRespawn() {
+    // 尖刺死亡检测：任意玩家碰到 Spike，死亡次数增加，并把该玩家送回本关出生点。
     LevelData &lv = levels[currentLevelIndex];
 
     bool p1Hit = false;
@@ -659,6 +744,7 @@ void GameScene::checkSpikeCollisionAndRespawn() {
 }
 
 void GameScene::checkItemPickups() {
+    // 道具拾取：玩家碰到草药会增加收集数，碰到小熊钥匙扣会记录隐藏成就条件。
     LevelData &lv = levels[currentLevelIndex];
     const QRectF p1Rect = p1->sceneBoundingRect();
     const QRectF p2Rect = p2->sceneBoundingRect();
@@ -681,6 +767,7 @@ void GameScene::checkItemPickups() {
                 it.visualItem = nullptr;
             }
             if (it.itemType == QString("bear_keychain")) {
+                // 小熊钥匙扣是隐藏彩蛋，多句对白会进入对白队列按顺序播放。
                 if (!it.p1PickupText.isEmpty()) {
                     const QStringList lines = it.p1PickupText.split('\n', Qt::SkipEmptyParts);
                     for (const QString &line : lines) {
@@ -709,6 +796,7 @@ void GameScene::checkItemPickups() {
 }
 
 void GameScene::updateLevelMechanics() {
+    // 关卡机关逻辑：处理双人开关门，以及第四关追逐墙。
     LevelData &lv = levels[currentLevelIndex];
     const QRectF p1Rect = p1->sceneBoundingRect();
     const QRectF p2Rect = p2->sceneBoundingRect();
@@ -732,6 +820,7 @@ void GameScene::updateLevelMechanics() {
     }
 
     if (allSwitchesTriggered && !activeDoorItems.isEmpty()) {
+        // 两个开关都触发后删除门，并播放“封锁解除”的系统提示。
         for (QGraphicsItem* doorItem : std::as_const(activeDoorItems)) {
             removeItem(doorItem);
             levelItems.removeOne(doorItem);
@@ -746,6 +835,7 @@ void GameScene::updateLevelMechanics() {
     }
 
     chaseWallItem->moveBy(lv.chaseWallSpeed, 0);
+    // 追逐墙靠近玩家时播放一次警告对白。
     if (!chaseWallIntroShown && chaseWallItem->sceneBoundingRect().right() > p1->x() - 180) {
         chaseWallIntroShown = true;
         showDialogue(QString::fromUtf8("艾达：这地方要塌了，别停。"), 120);
@@ -877,4 +967,41 @@ void GameScene::updateCamera() {
         dialogueTextItem->setTextWidth(boxWidth - 32);
         dialogueTextItem->setPos(boxX + 16, boxY + 11);
     }
+}
+
+void GameScene::updateHud() {
+    const auto sceneViews = views();
+    if (sceneViews.isEmpty()) {
+        return;
+    }
+
+    QGraphicsView *view = sceneViews.first();
+    const QRectF viewRect = view->viewport()->rect();
+    const qreal halfW = viewRect.width() * 0.5;
+    const qreal halfH = viewRect.height() * 0.5;
+
+    qreal cx = p1->x() + p1->rect().width() * 0.5;
+    qreal cy = p1->y() + p1->rect().height() * 0.5;
+
+    const QRectF s = sceneRect();
+    if (s.width() > viewRect.width()) {
+        cx = qBound(s.left() + halfW, cx, s.right() - halfW);
+    } else {
+        cx = s.center().x();
+    }
+    if (s.height() > viewRect.height()) {
+        cy = qBound(s.top() + halfH, cy, s.bottom() - halfH);
+    } else {
+        cy = s.center().y();
+    }
+
+    const qreal hudX = cx + halfW - 230;
+    const qreal hudY = cy - halfH + 18;
+    hudBoxItem->setPos(hudX, hudY);
+    hudTextItem->setPos(hudX + 12, hudY + 9);
+    hudTextItem->setPlainText(QString::fromUtf8("第%1关 / 4\n草药：%2 / %3\n死亡：%4")
+        .arg(currentLevelIndex + 1)
+        .arg(herbsCollected)
+        .arg(totalHerbs)
+        .arg(deathCount));
 }

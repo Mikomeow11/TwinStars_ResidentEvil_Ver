@@ -14,9 +14,14 @@ class GameScene : public QGraphicsScene {
     Q_OBJECT
 public:
     explicit GameScene(QObject *parent = nullptr);
+    void pauseGame();
+    void resumeGame();
+    void stopGame();
+    void restartCurrentLevel();
 
 signals:
     void gameCompleted(int herbsCollected, int totalHerbs, bool bearKeychainCollected, int deathCount);
+    void pauseRequested();
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -71,6 +76,7 @@ private:
     void initLevels();
     void loadLevel(int levelIndex);
     void updateCamera();
+    void updateHud();
     void checkGoalAndMaybeSwitchLevel();
     void checkDialogueTriggers();
     void checkSpikeCollisionAndRespawn();
@@ -100,6 +106,8 @@ private:
 
     QGraphicsRectItem *dialogueBoxItem;
     QGraphicsTextItem *dialogueTextItem;
+    QGraphicsRectItem *hudBoxItem;
+    QGraphicsTextItem *hudTextItem;
     int dialogueFramesLeft;
     QQueue<QPair<QString, int>> dialogueQueue;
     int goalLockHintCooldownFrames;

@@ -1,5 +1,4 @@
 #include "Player.h"
-
 #include "Ground.h"
 #include "Platform.h"
 #include <QGraphicsPixmapItem>
@@ -19,10 +18,12 @@ Player::Player(int id, QColor color, QGraphicsItem *parent)
       facingRight(true),
       spriteItem(nullptr)
 {
+    // Player 负责单个角色的显示、键盘移动、跳跃、重力和碰撞。
     setRect(0, 0, 64, 96);
     setBrush(Qt::NoBrush);
     setPen(Qt::NoPen);
 
+    // playerId 区分两个玩家：1 号玩家使用里昂立绘，2 号玩家使用艾达立绘。
     QString spritePath;
     if (playerId == 1) {
         spritePath = ":/assets/characters/p1_idle.png.png";
@@ -42,9 +43,11 @@ Player::Player(int id, QColor color, QGraphicsItem *parent)
 }
 
 void Player::updatePosition(const QSet<int>& keys) {
+    // 每一帧由 GameScene::mainGameLoop 调用，根据当前按键集合更新角色位置。
     constexpr qreal kEpsilon = 0.1;
     qreal dx = 0.0;
 
+    // 双人控制键位：P1 使用 A/D/W，P2 使用 左/右/上 方向键。
     const int leftKey = (playerId == 1) ? Qt::Key_A : Qt::Key_Left;
     const int rightKey = (playerId == 1) ? Qt::Key_D : Qt::Key_Right;
     const int jumpKey = (playerId == 1) ? Qt::Key_W : Qt::Key_Up;
@@ -62,6 +65,7 @@ void Player::updatePosition(const QSet<int>& keys) {
         facingRight = false;
     }
 
+    // 根据移动方向翻转立绘，让角色朝向当前前进方向。
     if (spriteItem) {
         if (facingRight) {
             spriteItem->setTransform(QTransform());
@@ -106,8 +110,10 @@ void Player::updatePosition(const QSet<int>& keys) {
         }
 
         if (dx > 0 && oldRect.right() <= blockRect.left() + kEpsilon) {
+            // 从左侧撞到障碍，贴到障碍左边。
             setX(blockRect.left() - rect().width());
         } else if (dx < 0 && oldRect.left() >= blockRect.right() - kEpsilon) {
+            // 从右侧撞到障碍，贴到障碍右边。
             setX(blockRect.right());
         }
     }
@@ -147,10 +153,12 @@ void Player::updatePosition(const QSet<int>& keys) {
         if (ground) {
             // 地板：上下都阻挡，角色可稳定站立
             if (velocityY >= 0 && landingFromAbove) {
+                // 下落到地板上：把角色放到地板顶面，并清空竖直速度。
                 setY(blockRect.top() - rect().height());
                 velocityY = 0.0;
                 isOnGround = true;
             } else if (velocityY < 0 && crossesBottom) {
+                // 从下方顶到地板：停止上升，防止穿透。
                 setY(blockRect.bottom());
                 velocityY = 0.0;
             }
@@ -159,6 +167,7 @@ void Player::updatePosition(const QSet<int>& keys) {
 
         // 平台：只在从上方向下落时可站立
         if (platform && velocityY >= 0 && landingFromAbove) {
+            // 平台是单向平台，角色从下方跳过时不会被挡住。
             setY(blockRect.top() - rect().height());
             velocityY = 0.0;
             isOnGround = true;

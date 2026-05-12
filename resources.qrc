@@ -1,18 +1,27 @@
 <RCC>
     <qresource prefix="/">
+        <!-- 录屏讲解定位：Qt 资源文件。登记后，代码里才能用 :/assets/... 路径加载图片。 -->
+        <!-- 地图地块和四个关卡背景图。 -->
         <file>assets/tiles/ground_tile.png</file>
         <file>assets/backgrouds/level1_bg.png</file>
         <file>assets/backgrouds/level2_bg.png</file>
+        <!-- 双人角色立绘：Player.cpp 和结尾剧情页都会使用。 -->
         <file>assets/characters/p1_idle.png.png</file>
         <file>assets/characters/p2_idle.png.png</file>
+        <!-- 可收集道具：草药用于普通收集，小熊钥匙扣用于隐藏成就。 -->
         <file>assets/items/herb.png</file>
+        <!-- UI 页面图片：封面、键位教程、剧情介绍和结尾背景。 -->
         <file>assets/ui/start_page.png</file>
         <file>assets/ui/tutorial_p1.png</file>
         <file>assets/ui/tutorial_p2.png</file>
         <file>assets/ui/story_page.png</file>
+        <file>assets/ui/ending_transition.png</file>
         <file>assets/backgrouds/level3_bg.png</file>
         <file>assets/backgrouds/level4_bg.png</file>
         <file>assets/items/bear_keychain.png</file>
+        <!-- 结算页滚动展示的 guest 贺图。 -->
         <file>assets/ui/guests/guest_01.png</file>
+        <file>assets/ui/guests/guest_02.png</file>
+        <file>assets/ui/guests/guest_03.png</file>
     </qresource>
 </RCC>
